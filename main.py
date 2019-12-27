@@ -12,10 +12,7 @@ tiktok_url = 'https://tikitoks.com/'
 
 
 def download_user_videos(username=None):
-    if not username:
-        print('Username not found')
-    else:
-        user_homepage_url = ''.join([tiktok_url, '@', username])
+    def get_user_video_urls():
         try:
             content = requests.post("https://tikitoks.com/@" + username,
                                     data=json.dumps(PAYLOAD),
@@ -23,10 +20,12 @@ def download_user_videos(username=None):
         except Exception as e:
             logger.error(e)
         else:
-
-            video_pattern = re.compile(b'/video/[0-9]+')
-            user_videos = re.findall(video_pattern, content)
-            print('Videos count: {}'.format(len(user_videos)))
+            return map(str, re.findall(b'/video/[0-9]+', content))
+    if not username:
+        logger.warning('Username not found')
+    else:
+        for url in get_user_video_urls():
+            download_video(url)
 
     # if 1 < video_cn <= VIDEOS_COUNT:
     #     for _ in range(video_cn):
@@ -35,8 +34,12 @@ def download_user_videos(username=None):
     #     print(ERROR)
 
 
-def download_video():
-    pass
+def download_video(url):
+    # import urllib.request
+    full_url = ''.join([tiktok_url, '@', tiktok_user, url])
+
+    # urllib.request.urlretrieve(full_url, '{}.mp4'.format(url[-19:]))
+    with open(full_url, 'wb')
 
 
 def create_downloading_thread():
