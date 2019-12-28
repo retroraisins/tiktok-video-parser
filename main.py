@@ -28,7 +28,13 @@ def download_user_videos(username=None):
         for url in get_user_video_urls():
             download_video(url)
 
+    def get_video_src(url):
+        page = requests.get(url)
+        tree = html.fromstring(page.content)
+        source = tree.xpath('//video/@src')
+        return source[0]
 
+    
 def put_urls_in_file(urls):
     with open('video_url.txt', 'w') as f:
         for url in urls:
