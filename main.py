@@ -1,39 +1,32 @@
-# from threading import Thread
-from conf import HEADERS, PAYLOAD
 import requests
-import json
-import re
+from lxml import html
 import logging
 
 
 logger = logging.getLogger()
 ERROR = 'Count can''t be negative'
-tiktok_url = 'https://tikitoks.com/'
+TIKTOK_URL = 'https://tikitoks.com/'
+DOG = '@'
 
 
 def download_user_videos(username=None):
     def get_user_video_urls():
         try:
-            text = requests.post("https://tikitoks.com/@" + username,
-                                 data=json.dumps(PAYLOAD),
-                                 headers=HEADERS).text
+            url = ''.join([TIKTOK_URL + DOG + username])
+            page = requests.get(url)
         except Exception as e:
             logger.error(e)
         else:
-            urls = re.findall('https://tikitoks.com/.+/video/[0-9]+', text)
-            put_urls_in_file(urls)
-            return urls[0:3]
+            tree = html.fromstring(page.content)
+            hrefs = tree.xpath('//a/@href')
+            pat = username + '/video'
+            return filter(lambda x: pat in x, hrefs)
+
     if not username:
         logger.warning('Username not found')
     else:
         for url in get_user_video_urls():
             download_video(url)
-
-    # if 1 < video_cn <= VIDEOS_COUNT:
-    #     for _ in range(video_cn):
-    #         create_downloading_thread()
-    # else:
-    #     print(ERROR)
 
 
 def put_urls_in_file(urls):
