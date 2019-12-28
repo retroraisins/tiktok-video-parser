@@ -20,7 +20,10 @@ def download_user_videos(username=None):
         except Exception as e:
             logger.error(e)
         else:
-            return map(str, re.findall(b'/video/[0-9]+', content))
+            urls = list(map(str, re.findall(b'https://tikitoks.com/.+/video/[0-9]+',
+                                       content)))
+            put_urls_in_file(urls)
+            return urls
     if not username:
         logger.warning('Username not found')
     else:
@@ -34,12 +37,19 @@ def download_user_videos(username=None):
     #     print(ERROR)
 
 
+def put_urls_in_file(urls):
+    with open('video_url.txt', 'w') as f:
+        for url in urls:
+            print(url, file=f)
+
+
 def download_video(url):
+    print(url)
     # import urllib.request
-    full_url = ''.join([tiktok_url, '@', tiktok_user, url])
+    # full_url = ''.join([tiktok_url, '@', tiktok_user, url])
 
     # urllib.request.urlretrieve(full_url, '{}.mp4'.format(url[-19:]))
-    with open(full_url, 'wb')
+    # with open(full_url, 'wb')
 
 
 def create_downloading_thread():
