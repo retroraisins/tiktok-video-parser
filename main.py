@@ -14,16 +14,15 @@ tiktok_url = 'https://tikitoks.com/'
 def download_user_videos(username=None):
     def get_user_video_urls():
         try:
-            content = requests.post("https://tikitoks.com/@" + username,
-                                    data=json.dumps(PAYLOAD),
-                                    headers=HEADERS).content
+            text = requests.post("https://tikitoks.com/@" + username,
+                                 data=json.dumps(PAYLOAD),
+                                 headers=HEADERS).text
         except Exception as e:
             logger.error(e)
         else:
-            urls = list(map(str, re.findall(b'https://tikitoks.com/.+/video/[0-9]+',
-                                       content)))
+            urls = re.findall('https://tikitoks.com/.+/video/[0-9]+', text)
             put_urls_in_file(urls)
-            return urls
+            return urls[0:3]
     if not username:
         logger.warning('Username not found')
     else:
@@ -44,12 +43,15 @@ def put_urls_in_file(urls):
 
 
 def download_video(url):
-    print(url)
-    # import urllib.request
-    # full_url = ''.join([tiktok_url, '@', tiktok_user, url])
-
-    # urllib.request.urlretrieve(full_url, '{}.mp4'.format(url[-19:]))
-    # with open(full_url, 'wb')
+    resp = requests.get(url).text
+    video_src = re.search
+    match = re.search(r'\d+', url)
+    if match:
+        filename = ''.join([match.group(0), '.mp4'])
+        logging.warning('start downloading from {}'.format(url))
+        with open(filename, 'wb') as f:
+            f.write(resp.content)
+        logging.warning('finished')
 
 
 def create_downloading_thread():
