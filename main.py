@@ -1,3 +1,4 @@
+from threading import Thread
 import requests
 from lxml import html
 import logging
@@ -22,19 +23,34 @@ def download_user_videos(username=None):
             pat = username + '/video'
             return filter(lambda x: pat in x, hrefs)
 
-    if not username:
-        logger.warning('Username not found')
-    else:
-        for url in get_user_video_urls():
-            download_video(url)
-
     def get_video_src(url):
         page = requests.get(url)
         tree = html.fromstring(page.content)
         source = tree.xpath('//video/@src')
-        return source[0]
+        print(source[0])
+        # return source[0]
 
-    
+    def threading_requests(urls):
+        threads = []
+        for url in urls:
+            process = Thread(target=get_video_src, args=[url])
+            process.start()
+            threads.append(process)
+        # We now pause execution on the main thread by 'joining' all of our started threads.
+        # This ensures that each has finished processing the urls.
+        for process in threads:
+            process.join()
+
+    if not username:
+        logger.warning('Username not found')
+    else:
+        import time
+        t0 = time.clock()
+        urls_data = get_user_video_urls()
+        threading_requests(urls_data)
+        logger.info('Exec time: {}'.format(time.clock() - t0))
+
+
 def put_urls_in_file(urls):
     with open('video_url.txt', 'w') as f:
         for url in urls:
@@ -42,8 +58,6 @@ def put_urls_in_file(urls):
 
 
 def download_video(url):
-    resp = requests.get(url).text
-    video_src = re.search
     match = re.search(r'\d+', url)
     if match:
         filename = ''.join([match.group(0), '.mp4'])
@@ -55,7 +69,7 @@ def download_video(url):
 
 def create_downloading_thread():
     pass
-    # thread = Thread(download_video, args=())
+
 
 
 tiktok_user = 'egorkreed'
