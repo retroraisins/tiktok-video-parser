@@ -2,10 +2,10 @@ from threading import Thread
 import requests
 from lxml import html
 import logging
-import ffmpeg
+import os
 import re
 from selenium import webdriver
-from selenium.webdriver.common.by import By
+import sys
 
 
 logger = logging.getLogger()
@@ -17,6 +17,11 @@ CHROME_PROFILE_LOCATION = '/Users/RRustam/Library/Application Support/Google/Chr
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'
     }
+git 
+PROXIES = {
+    'http': 'http://79.190.145.141:3128',
+    'https': 'https://95.79.57.206:53281'
+}
 
 
 def test_chrome_driver():
@@ -52,17 +57,18 @@ def download_user_videos(username=None):
 
     def get_user_video_urls(url):
         try:
-
-            page = requests.get(url, headers=HEADERS)
+            page = requests.get(url, headers=HEADERS, proxies=PROXIES)
         except Exception as e:
             logger.error(e)
         else:
             tree = html.fromstring(page.content)
             hrefs = tree.xpath('//a/@href')
-            if len(hrefs) == 0:
-                raise Exception('links on videos not found')
+
             pat = username + '/video'
-            return filter(lambda x: pat in x, hrefs)
+            user_video_urls = list(filter(lambda x: pat in x, hrefs))
+            if len(user_video_urls) == 0:
+                sys.exit('Links videos not found. Or it is possible error on server side. Script stopped')
+            return user_video_urls
 
     if not username:
         logger.warning('Username not found')
@@ -71,29 +77,20 @@ def download_user_videos(username=None):
         t0 = time.clock()
         user_home_page_url = ''.join([TIKITOKS_URL + DOG + username])
         tikitoks_video_urls = get_user_video_urls(user_home_page_url)
-        tikitoks_video_ids = (url.split('/')[-2] for url in tikitoks_video_urls)
+        tikitoks_video_ids = list(url.split('/')[-2] for url in tikitoks_video_urls)
         tiktok_video_urls = list(map(
             lambda _id: ''.join([TIKTOK_URL, DOG, username,  '/video/', _id]),
             tikitoks_video_ids))
         threading_requests(tiktok_video_urls, get_video_src)
-        logger.info('Exec time: {}'.format(time.clock() - t0))
+        logger.debug('Exec time: {}'.format(time.clock() - t0))
 
 
-def read_frame_as_jpeg(filename, frame_num=1):
-    # import ffmpeg as ffmpeg
-    out, err = (
-        ffmpeg
-        .input(filename)
-        .filter('select', 'gte(n,{})'.format(frame_num))
-        .output('pipe:', vframes=1, format='image2', vcodec='mjpeg')
-        .run(capture_stdout=True)
+def get_first_frame(in_filename):
+    out_filename = ''.join([in_filename.split('.')[0], '.jpg'])
+    ffmpg_cmd = 'ffmpeg -i {} -ss 00:00:00.000 -vframes 1 {}'.format(
+        in_filename, out_filename
     )
-    return out
-
-
-# def get_video_frame(path, frame_num=1):
-#     import os
-#     os.system('ffmpeg -i {} -ss 00:00:00.000 -vframes 1 thumb1.jpg'.format(path))
+    os.system(ffmpg_cmd)
 
 
 def get_video_src(url):
@@ -124,10 +121,10 @@ def threading_requests(items_to_request, func):
 
 def download_video(url):
     r = requests.get(url)
-    logging.warning('start downloading from {}'.format(url[0:32]))
+    logging.info('start downloading from {}'.format(url[0:32]))
     with open(url[24:44] + '.mp4', 'wb') as f:
         f.write(r.content)
-    logging.warning('finished')
+    logging.info('finished')
 
 
 def get_video_id_from(url):
@@ -138,5 +135,7 @@ def create_downloading_thread():
     pass
 
 
-tiktok_user = 'egorkreed'
-download_user_videos(tiktok_user)
+# tiktok_user = 'egorkreed'
+# download_user_videos(tiktok_user)
+
+get_first_frame('2a40d4d5b3b7cd091632.mp4')
