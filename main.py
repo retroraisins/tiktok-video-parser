@@ -3,10 +3,10 @@ import requests
 from lxml import html
 import logging
 import os
-from selenium import webdriver
 import sys
-from conf import HEADERS, PROXIES, SRC_FILE_PATH, URLS_FILE_PATH, \
-    VIDEOS_FILES_PATH, FRAMES_FILES_PATH, CHROME_PROFILE_LOCATION
+from conf import HEADERS, PROXIES, SRC_FILE_PATH,   \
+    URLS_FILE_PATH, FRAMES_FILES_PATH, \
+    VIDEOS_FILES_PATH
 
 
 logger = logging.getLogger()
@@ -19,13 +19,6 @@ LINKS_NOT_FOUND_OR_SERVER_ERR = 'Links videos not found. Or it is possible ' \
 
 
 def download_user_videos(username=None):
-    def get_user_id():
-        pass
-
-    def get_chrome_profile():
-        options = webdriver.ChromeOptions()
-        options.add_argument('--user-data-dir={}'.format(CHROME_PROFILE_LOCATION))
-        return options
 
     def get_user_id_from_tree(tree):
         hrefs = tree.xpath('//a/@href')
@@ -36,19 +29,6 @@ def download_user_videos(username=None):
         hrefs = tree.xpath('//a/@href')
         pat = username + '/video'
         return list(filter(lambda x: pat in x, hrefs))
-
-    def get_user_video_urls_with_selenium(url):
-        driver = webdriver.Chrome()
-        driver.get(url)
-        element = driver.find_element_by_link_text('Load more...')
-        element.click()
-        page = driver.page_source
-        tree = html.fromstring(page)
-        user_video_urls = get_video_url_from_tree(tree)
-        user_id = get_user_id_from_tree(tree)
-        if len(user_video_urls) == 0:
-            sys.exit(LINKS_NOT_FOUND_OR_SERVER_ERR)
-        return user_video_urls
 
     def get_page_with_load_more(tree):
         data_page = tree.xpath('//a/@data-page')[0]
@@ -140,8 +120,4 @@ def download_video(url):
         f.write(r.content)
     get_first_frame(save_to)
     logging.info('finished')
-
-
-tiktok_user = 'egorkreed'
-download_user_videos(tiktok_user)
 
