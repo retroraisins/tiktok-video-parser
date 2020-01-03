@@ -77,12 +77,6 @@ def download_user_videos(username=None):
         source = tree.xpath('//video/@src')
         download_video(source[0], url)
 
-    def put_urls_in_file(urls):
-        os.makedirs(os.path.dirname(URLS_FILE_PATH), exist_ok=True)
-        with open(URLS_FILE_PATH, 'w') as f:
-            for url in urls:
-                print(url, file=f)
-
     def threading_requests(items_to_request, func):
         threads = []
         for item in items_to_request:
@@ -121,9 +115,5 @@ def download_user_videos(username=None):
         tiktok_video_urls = list(map(
             lambda _id: ''.join([TIKTOK_URL, DOG, username,  '/video/', _id]),
             tikitoks_video_ids))
-        # put_urls_in_file(tiktok_video_urls)
         return threading_requests(tiktok_video_urls, get_video_src)
 
-
-res = download_user_videos('egorkreed')
-print(json.dumps(res, indent=2))
