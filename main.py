@@ -19,43 +19,63 @@ LINKS_NOT_FOUND_OR_SERVER_ERR = 'Links videos not found. Or it is possible ' \
 
 
 def download_user_videos(username=None):
+    def get_user_id():
+        pass
+
     def get_chrome_profile():
         options = webdriver.ChromeOptions()
         options.add_argument('--user-data-dir={}'.format(CHROME_PROFILE_LOCATION))
         return options
 
+    def get_user_id_from_tree(tree):
+        hrefs = tree.xpath('//a/@href')
+        pat = '/users/{}'.format(username)
+        return list(filter(lambda x: pat in x, hrefs))[0].split('/')[-1]
 
-    def get_links_with_video(driver, url):
-        driver.get(url)
-        page = driver.page_source
-        tree = html.fromstring(page)
+    def get_video_url_from_tree(tree):
         hrefs = tree.xpath('//a/@href')
         pat = username + '/video'
         return list(filter(lambda x: pat in x, hrefs))
 
     def get_user_video_urls_with_selenium(url):
-        options = get_chrome_profile()
-        driver = webdriver.Chrome(options=options)
-        user_video_urls = get_links_with_video(driver, url)
-        while len(user_video_urls) <= 30:
-            element = driver.find_element_by_link_text('Load more...')
-            element.click()
-            user_video_urls = get_links_with_video(driver, url)
-            if len(user_video_urls) == 0:
-                sys.exit(LINKS_NOT_FOUND_OR_SERVER_ERR)
+        driver = webdriver.Chrome()
+        driver.get(url)
+        element = driver.find_element_by_link_text('Load more...')
+        element.click()
+        page = driver.page_source
+        tree = html.fromstring(page)
+        user_video_urls = get_video_url_from_tree(tree)
+        user_id = get_user_id_from_tree(tree)
+        if len(user_video_urls) == 0:
+            sys.exit(LINKS_NOT_FOUND_OR_SERVER_ERR)
         return user_video_urls
+
+    def get_page_with_load_more(tree):
+        data_page = tree.xpath('//a/@data-page')[0]
+
+        user_id = get_user_id_from_tree(tree)
+        url = '{}@{}/loadVideos/{}?page={}'.format(TIKITOKS_URL, username,
+                                                   user_id, data_page)
+        headers = {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        resp = requests.get(url, headers=headers)
+        import json
+        data = json.loads(resp.text)
+        return data['html']
 
     def get_user_video_urls(url):
         try:
-            page = requests.get(url, headers=HEADERS, proxies=PROXIES)
+            page = requests.get(url, headers=HEADERS)
         except Exception as e:
             logger.error(e)
         else:
             tree = html.fromstring(page.content)
-            hrefs = tree.xpath('//a/@href')
-
-            pat = username + '/video'
-            user_video_urls = list(filter(lambda x: pat in x, hrefs))
+            user_video_urls = get_video_url_from_tree(tree)
+            content = get_page_with_load_more(tree)
+            tree = html.fromstring(content)
+            user_video_urls_2 = get_video_url_from_tree(tree)
+            user_video_urls += user_video_urls_2
             if len(user_video_urls) == 0:
                 sys.exit(LINKS_NOT_FOUND_OR_SERVER_ERR)
             return user_video_urls
@@ -64,8 +84,7 @@ def download_user_videos(username=None):
         logger.warning('Username not found')
     else:
         user_home_page_url = ''.join([TIKITOKS_URL + DOG + username])
-        tikitoks_video_urls = get_user_video_urls_with_selenium(
-            user_home_page_url)
+        tikitoks_video_urls = get_user_video_urls(user_home_page_url)
         tikitoks_video_ids = list(url.split('/')[-2] for url in tikitoks_video_urls)
         tiktok_video_urls = list(map(
             lambda _id: ''.join([TIKTOK_URL, DOG, username,  '/video/', _id]),
