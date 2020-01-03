@@ -6,7 +6,7 @@ import os
 from selenium import webdriver
 import sys
 from conf import HEADERS, PROXIES, SRC_FILE_PATH, URLS_FILE_PATH, \
-    VIDEOS_FILES_PATH, FRAMES_FILES_PATH
+    VIDEOS_FILES_PATH, FRAMES_FILES_PATH, CHROME_PROFILE_LOCATION
 
 
 logger = logging.getLogger()
@@ -19,6 +19,12 @@ LINKS_NOT_FOUND_OR_SERVER_ERR = 'Links videos not found. Or it is possible ' \
 
 
 def download_user_videos(username=None):
+    def get_chrome_profile():
+        options = webdriver.ChromeOptions()
+        options.add_argument('--user-data-dir={}'.format(CHROME_PROFILE_LOCATION))
+        return options
+
+
     def get_links_with_video(driver, url):
         driver.get(url)
         page = driver.page_source
@@ -28,7 +34,8 @@ def download_user_videos(username=None):
         return list(filter(lambda x: pat in x, hrefs))
 
     def get_user_video_urls_with_selenium(url):
-        driver = webdriver.Chrome()
+        options = get_chrome_profile()
+        driver = webdriver.Chrome(options=options)
         user_video_urls = get_links_with_video(driver, url)
         while len(user_video_urls) <= 30:
             element = driver.find_element_by_link_text('Load more...')
