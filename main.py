@@ -101,7 +101,8 @@ def download_user_videos(username=None):
         result.append({
             'src': src,
             'video_url': url,
-            'first_frame_path': save_to
+            'first_frame_path': save_to,
+            'nowatermark_video_url': ''
         })
         get_first_frame(save_to)
         logging.info('finished')
@@ -116,4 +117,19 @@ def download_user_videos(username=None):
             lambda _id: ''.join([TIKTOK_URL, DOG, username,  '/video/', _id]),
             tikitoks_video_ids))
         return threading_requests(tiktok_video_urls, get_video_src)
+
+
+url = 'https://tiktok.com/@egorkreed/video/6778760522310438150'
+
+
+def get_no_watermark_video(tiktok_url):
+    filename = tiktok_url.split('/')[-1]
+    page = requests.get('https://downloadtiktokvideos.com/?' + tiktok_url)
+    tree = html.fromstring(page.content)
+    source = tree.xpath('//source/@src')
+    r = requests.get(source)
+    with open(filename, 'wb') as f:
+        f.write(r.content)
+
+
 
