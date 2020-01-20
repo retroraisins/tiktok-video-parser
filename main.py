@@ -16,7 +16,7 @@ no_watermark_resource = namedtuple('no_watermark_resource',
 
 logger = logging.getLogger()
 TIKITOKS_URL = 'https://tikitoks.com/'
-TIKTOK_URL = 'https://www.tiktok.com/'
+TIKTOK_URL = 'https://tiktok.com/'
 DOG = '@'
 
 LINKS_NOT_FOUND_OR_SERVER_ERR = 'Links videos not found. Or it is possible ' \
@@ -81,9 +81,13 @@ def download_user_videos(username=None):
     def get_video_src(url):
         page = requests.get(url, headers=HEADERS)
         tree = html.fromstring(page.content)
-        source = tree.xpath('//video/@src')
-        return source[0]
-        # download_video(source[0], url)
+        res = tree.xpath('//video/@src')
+        try:
+            source = res[0]
+        except IndexError:
+            return None
+        else:
+            return source
 
     def threading_requests(items_to_request, func):
         threads = []
@@ -97,8 +101,7 @@ def download_user_videos(username=None):
         return result
 
     def get_video_data(video_id):
-        tik_tok_url = ''.join([TIKTOK_URL, DOG, username,  '/video/',
-                                       video_id])
+        tik_tok_url = ''.join([TIKTOK_URL, DOG, username,  '/video/', video_id])
         data = {
             video_id: {
                 'tik_tok_url': tik_tok_url,
@@ -106,7 +109,37 @@ def download_user_videos(username=None):
                 'watermark_video_src': get_watermarked_video_src(tik_tok_url)
             }
         }
-        return data
+        result.append(data)
+        # return data
+
+    def get_no_watermark_video_url_2(tiktok_url):
+        headers = HEADERS.copy()
+        headers['content-type'] = 'application/x-www-form-urlencoded'
+        params = {'url': tiktok_url}
+        _url = 'https://www.expertsphp.com/download.php'
+        resp = requests.post(_url, data=params, headers=headers)
+        if not resp:
+            print('No response from {}'.format(_url))
+            return None
+        tree = html.fromstring(resp.content)
+        source = tree.xpath('//source/@src')[0]
+        return source
+
+    # _url = 'https://downloadtiktokvideos.com'
+
+    def get_no_watermarked_video_src(tiktok_url):
+        tiki_toks_url = tiktok_url.replace(TIKTOK_URL, TIKITOKS_URL)
+        resp = requests.get(tiki_toks_url, headers=HEADERS)
+        tree = html.fromstring(resp.content)
+        try:
+            source = tree.xpath('//video/@src')[0]
+        except IndexError:
+            return None
+        else:
+            return source
+
+    def get_watermarked_video_src(tiktok_url):
+        return get_video_src(tiktok_url)
 
     def download_video(src):
         BEGIN = 24
@@ -119,8 +152,9 @@ def download_user_videos(username=None):
             f.write(r.content)
         return save_to
 
-    def get_tik_tok_video_url(video_id):
-        return ''.join([TIKTOK_URL, DOG, username, ''])
+    # def get_tik_tok_video_url(video_id):
+    #     return ''.join([TIKTOK_URL, DOG, username, ''])
+
     def get_video_urls_from_tiki_toks():
         user_home_page_url = ''.join([TIKITOKS_URL + DOG + username])
         return get_user_video_urls(user_home_page_url)
@@ -142,35 +176,9 @@ url_2 = 'https://www.tiktok.com/@egorkreed/video/6778834583266905349'
 
 username = 'egorkreed'
 res = download_user_videos(username)
-
-
-def get_watermarked_video_src(video_id):
-    pass
-
-
-def get_no_watermark_video_url_2(video_id):
-    headers = {'content-type': 'application/x-www-form-urlencoded'}
-    filename = tiktok_url.split('/')[-1]
-    params = {'url': tiktok_url}
-    _url = 'https://www.expertsphp.com/download.php'
-    page = requests.post(_url, data=params, headers=headers)
-    tree = html.fromstring(page.content)
-    source = tree.xpath('//source/@src')[0]
-    print(source)
-    r = requests.get(source)
-    with open(filename + '.mp4', 'wb') as f:
-        f.write(r.content)
-
-
-def get_no_watermarked_video_src(tiktok_url):
-    params = {'url': tiktok_url}
-    _url = 'https://downloadtiktokvideos.com'
-    resp = requests.get(_url, params=params)
-    if not resp:
-        return get_no_watermark_video_url_2(_url)
-    tree = html.fromstring(resp.content)
-    source = tree.xpath('//source/@src')[0]
-    return source
+print(json.load(res))
+# from pprint import pprint
+# pprint(res)
 
 
 def say_hello_user_tiktok_homepage(user):
@@ -227,12 +235,3 @@ def get_user_videos(user):
     video_urls = [item.get('itemInfos').get('video').get('urls')
                   for item in itemsListData]
     return video_urls
-
-
-# user_login = 'egorkreed'
-# get_user_videos(user_login)
-# content = say_hello_user_tiktok_homepage(user_login)
-# get_user_data(content)
-
-# print(json.load(download_user_videos(user)))
-
