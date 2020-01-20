@@ -7,6 +7,11 @@ import sys
 import json
 from conf import HEADERS, PROXIES, FRAMES_FILES_PATH, \
     VIDEOS_FILES_PATH
+from collections import namedtuple
+no_watermark_resource = namedtuple('no_watermark_resource',
+                                   'resource, url, xpath, request_type, params')
+
+
 
 
 logger = logging.getLogger()
@@ -17,11 +22,6 @@ DOG = '@'
 LINKS_NOT_FOUND_OR_SERVER_ERR = 'Links videos not found. Or it is possible ' \
                                 'error on server side. Script stopped'
 USER_NOT_FOUND_ERR = 'Couldn''t find this account'
-
-
-def generate_signature(value):
-    p = os.popen('node signature_gen.js %s' % value)
-    return (p.readlines()[0]).strip()
 
 
 def download_user_videos(username=None):
@@ -37,7 +37,7 @@ def download_user_videos(username=None):
         pat = username + '/video'
         return list(filter(lambda x: pat in x, hrefs))
 
-    def get_page_with_load_more(tree):
+    def load_more_videos(tree):
         data_page = tree.xpath('//a/@data-page')[0]
 
         user_id = get_user_id_from_tree(tree)
@@ -47,7 +47,6 @@ def download_user_videos(username=None):
             'X-Requested-With': 'XMLHttpRequest'
         }
         resp = requests.get(url, headers=headers)
-        import json
         data = json.loads(resp.text)
         return data['html']
 
@@ -59,23 +58,13 @@ def download_user_videos(username=None):
         return True
 
     def get_user_video_urls(url):
-        try:
-            page = requests.get(url, headers=HEADERS)
-        except Exception as e:
-            logger.error(e)
-        else:
-            tree = html.fromstring(page.content)
-            # if not is_user_found(tree):
-            #     sys.exit(LINKS_NOT_FOUND_OR_SERVER_ERR)
-
-            # user_video_urls = get_video_url_from_tree(tree)
-            content = get_page_with_load_more(tree)
-            tree = html.fromstring(content)
-            user_video_urls = get_video_url_from_tree(tree)
-            # user_video_urls += user_video_urls_2
-            if len(user_video_urls) == 0:
-                sys.exit(LINKS_NOT_FOUND_OR_SERVER_ERR)
-            return user_video_urls
+        page = requests.get(url, headers=HEADERS)
+        tree = html.fromstring(page.content)
+        user_video_urls = get_video_url_from_tree(tree)
+        content = load_more_videos(tree)
+        tree = html.fromstring(content)
+        user_video_urls += get_video_url_from_tree(tree)
+        return user_video_urls
 
     def get_first_frame(in_file_path):
         out_filename = ''.join([os.path.basename(in_file_path).split('.')[0], '.jpg'])
@@ -86,11 +75,15 @@ def download_user_videos(username=None):
             in_file_path, out)
         os.system(ffmpg_cmd)
 
+    def get_no_watermark_video_src(url):
+        return get_video_src(url)
+
     def get_video_src(url):
         page = requests.get(url, headers=HEADERS)
         tree = html.fromstring(page.content)
         source = tree.xpath('//video/@src')
-        download_video(source[0], url)
+        return source[0]
+        # download_video(source[0], url)
 
     def threading_requests(items_to_request, func):
         threads = []
@@ -103,48 +96,59 @@ def download_user_videos(username=None):
 
         return result
 
-    def download_video(src, url):
+    def get_video_data(video_id):
+        tik_tok_url = ''.join([TIKTOK_URL, DOG, username,  '/video/',
+                                       video_id])
+        data = {
+            video_id: {
+                'tik_tok_url': tik_tok_url,
+                'no_watermark_video_src': get_no_watermarked_video_src(tik_tok_url),
+                'watermark_video_src': get_watermarked_video_src(tik_tok_url)
+            }
+        }
+        return data
+
+    def download_video(src):
         BEGIN = 24
         END = 44
         r = requests.get(src)
-        logging.info('start downloading from {}'.format(src[0:32]))
         filename = src[BEGIN:END] + '.mp4'
         save_to = VIDEOS_FILES_PATH + filename
         os.makedirs(os.path.dirname(save_to), exist_ok=True)
         with open(save_to, 'wb') as f:
             f.write(r.content)
-        result.append({
-            'src': src,
-            'video_url': url,
-            'first_frame_path': save_to,
-            'nowatermark_video_url': ''
-        })
-        get_first_frame(save_to)
-        logging.info('finished')
+        return save_to
+
+    def get_tik_tok_video_url(video_id):
+        return ''.join([TIKTOK_URL, DOG, username, ''])
+    def get_video_urls_from_tiki_toks():
+        user_home_page_url = ''.join([TIKITOKS_URL + DOG + username])
+        return get_user_video_urls(user_home_page_url)
+
+    def get_urls_from_tik_tok():
+        pass
 
     if not username:
         logger.warning('Username not found')
     else:
-        user_home_page_url = ''.join([TIKITOKS_URL + DOG + username])
-        tikitoks_video_urls = get_user_video_urls(user_home_page_url)
-        tikitoks_video_ids = list(url.split('/')[-2] for url in tikitoks_video_urls)
-        tiktok_video_urls = list(map(
-            lambda _id: ''.join([TIKTOK_URL, DOG, username,  '/video/', _id]),
-            tikitoks_video_ids))
-        return threading_requests(tiktok_video_urls, get_video_src)
+
+        urls = get_video_urls_from_tiki_toks()
+        video_ids = (url.split('/')[-2] for url in urls)
+        return threading_requests(video_ids, get_video_data)
 
 
 url = 'https://tiktok.com/@egorkreed/video/6778760522310438150'
 url_2 = 'https://www.tiktok.com/@egorkreed/video/6778834583266905349'
 
-from collections import namedtuple
-no_watermark_resource = namedtuple('no_watermark_resource',
-                                   'resource, url, xpath, request_type, params')
-#
-# no_watermark_resource.
+username = 'egorkreed'
+res = download_user_videos(username)
 
 
-def get_no_watermark_video_url_2(tiktok_url):
+def get_watermarked_video_src(video_id):
+    pass
+
+
+def get_no_watermark_video_url_2(video_id):
     headers = {'content-type': 'application/x-www-form-urlencoded'}
     filename = tiktok_url.split('/')[-1]
     params = {'url': tiktok_url}
@@ -158,25 +162,77 @@ def get_no_watermark_video_url_2(tiktok_url):
         f.write(r.content)
 
 
-def get_watermarked_video_url(tiktok_url):
-    pass
-
-
-def get_no_watermark_video_url(tiktok_url):
+def get_no_watermarked_video_src(tiktok_url):
     params = {'url': tiktok_url}
     _url = 'https://downloadtiktokvideos.com'
-    page = requests.get(_url, params=params)
-    tree = html.fromstring(page.content)
+    resp = requests.get(_url, params=params)
+    if not resp:
+        return get_no_watermark_video_url_2(_url)
+    tree = html.fromstring(resp.content)
     source = tree.xpath('//source/@src')[0]
-    print(source)
     return source
-    # r = requests.get(source)
-    # with open(filename, 'wb') as f:
-    #     f.write(r.content)
 
 
+def say_hello_user_tiktok_homepage(user):
+    headers = {
+        'accept-encoding': 'gzip, deflate, br',
+        'accept-language': 'zh-CN,zh;q=0.9',
+        'pragma': 'no-cache',
+        'cache-control': 'no-cache',
+        'upgrade-insecure-requests': '1',
+        'user-agent': "Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1",
+        'cookie': '_ga=GA1.2.451251963.1579009961; _gid=GA1.2.465797066.1579009961'
+    }
+    response = requests.get(TIKTOK_URL + '@' + user, headers=headers)
+    if response:
+        return response
+    return None
 
-# print(get_no_watermark_video_url(url_2))
-user = 'egorkreed'
-print(json.load(download_user_videos(user)))
+
+def get_user_data(content):
+    tree = html.fromstring(content)
+    data = tree.xpath('//*[@id="__NEXT_DATA__"]')[0]
+    json_data = json.loads(data.text)
+    props = json_data.get('props')
+    pageProps = props.get('pageProps')
+    return pageProps.get('userData')
+
+
+def get_user_videos(user):
+    response = say_hello_user_tiktok_homepage(user)
+    user_data = get_user_data(response.content)
+    headers = {
+        'accept-encoding': 'gzip, deflate, br',
+        'accept-language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36'
+
+    }
+    params = {
+        'secUid': user_data.get('secUid'),
+        'id': 6568346904743116806,#user_data.get('userId'),
+        'type': 1,
+        'count': 30,
+        'minCursor': 0,
+        'maxCursor': 0,
+        'shareUid': '',
+        '_signature': 'QNUoGgAgEBnMwKX.LRgSlEDVKQAAB7M'#generate_signature(user_data.get('userId'))
+    }
+    response = requests.get('https://m.tiktok.com/share/item/list',
+                            headers=headers, params=params)
+
+    data = json.loads(response.content)
+    body = data.get('body')
+    itemsListData = data.get('itemsListData')
+    video_identifiers = [item.get('itemInfos').get('id') for item in itemsListData]
+    video_urls = [item.get('itemInfos').get('video').get('urls')
+                  for item in itemsListData]
+    return video_urls
+
+
+# user_login = 'egorkreed'
+# get_user_videos(user_login)
+# content = say_hello_user_tiktok_homepage(user_login)
+# get_user_data(content)
+
+# print(json.load(download_user_videos(user)))
 
