@@ -9,7 +9,8 @@
 
 # 3. Использованпие
   создать экземпляр класс `TikTokUserVideoApi`
-```python
+```
+    #python
     user_api = TikTokUserVideoApi('egorkreed')
     data = user_api.video_data
 ```
