@@ -7,16 +7,17 @@
 `pip install -r requirements.txt`
 
 
-# 3. Запуск
-  Импортировать метод `download_user_videos`
-  Передать на вход методу tiktok логин юзера `download_user_videos(username)`
+# 3. Использованпие
+  создать экземпляр класс `TikTokUserVideoApi`
+```python
+    user_api = TikTokUserVideoApi('egorkreed')
+    data = user_api.video_data
+```
+  
 # 4.Настройки
-  в файл conf.py можно задать проки(PROXY) и относительные пути куда сохранять urls видео, sources видео,
-  папку для сохранения загруженных видео и фреймов
+  в файл conf.py можно задать проки(PROXY) и относительные пути куда сохранять загруженные видео и фреймы
   по умолчанию установленые следующие пути:
 ```
-  SRC_FILE_PATH = './sources/video_src.txt'`
-  URLS_FILE_PATH = './urls/video_urls.txt'
   VIDEOS_FILES_PATH = './videos/'
   FRAMES_FILES_PATH = 'frames/'
 ```  
