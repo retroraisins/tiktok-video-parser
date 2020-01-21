@@ -86,7 +86,7 @@ class TikTokUserVideoApi:
             process.join()
 
     def _get_video_data(self, video_id):
-        tik_tok_url = ''.join([TIKTOK_URL, DOG, username, '/video/', video_id])
+        tik_tok_url = ''.join([TIKTOK_URL, DOG, self.username, '/video/', video_id])
         data = {
             video_id: {
                 'tik_tok_url': tik_tok_url,
@@ -138,7 +138,7 @@ class TikTokUserVideoApi:
         return self._get_video_src(tiktok_url)
 
     def _get_video_urls_from_tiki_toks(self):
-        user_home_page_url = ''.join([TIKITOKS_URL + DOG + username])
+        user_home_page_url = ''.join([TIKITOKS_URL + DOG + self.username])
         return self._get_user_video_urls_from_homepege(user_home_page_url)
 
     @property
