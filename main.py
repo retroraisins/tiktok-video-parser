@@ -4,7 +4,8 @@ from lxml import html
 import logging
 
 import json
-from conf import HEADERS, PROXIES, TIKTOK_URL, TIKITOKS_URL
+from conf import HEADERS, PROXIES, TIKTOK_URL, TIKITOKS_URL, \
+    DOWNLOADTIKTOKVIDEOS
 from collections import namedtuple
 no_watermark_resource = namedtuple('no_watermark_resource',
                                    'resource, url, xpath, request_type, params')
@@ -149,3 +150,4 @@ class TikTokUserVideoApi:
             video_ids = (url.split('/')[-2] for url in urls)
             self._threading_requests(video_ids, self._get_video_data)
             return self._video_data
+
