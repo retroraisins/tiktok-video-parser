@@ -4,15 +4,14 @@ from lxml import html
 import logging
 
 import json
-from conf import HEADERS, PROXIES, FRAMES_FILES_PATH
+from conf import HEADERS, PROXIES, TIKTOK_URL, TIKITOKS_URL
 from collections import namedtuple
 no_watermark_resource = namedtuple('no_watermark_resource',
                                    'resource, url, xpath, request_type, params')
 
 
 logger = logging.getLogger()
-TIKITOKS_URL = 'https://tikitoks.com/'
-TIKTOK_URL = 'https://tiktok.com/'
+
 DOWNLOADTIKTOKVIDEOS = 'https://downloadtiktokvideos.com'
 DOG = '@'
 
@@ -28,19 +27,19 @@ class TikTokUserVideoApi:
 
     def _get_user_id_from_tree(self, tree):
         hrefs = tree.xpath('//a/@href')
-        pat = '/users/{}'.format(username)
+        pat = '/users/{}'.format(self.username)
         return list(filter(lambda x: pat in x, hrefs))[0].split('/')[-1]
 
     def _get_video_url_from_tree(self, tree):
         hrefs = tree.xpath('//a/@href')
-        pat = username + '/video'
+        pat = self.username + '/video'
         return list(filter(lambda x: pat in x, hrefs))
 
     def _load_more_videos(self, tree):
         data_page = tree.xpath('//a/@data-page')[0]
 
         user_id = self._get_user_id_from_tree(tree)
-        url = '{}@{}/loadVideos/{}?page={}'.format(TIKITOKS_URL, username,
+        url = '{}@{}/loadVideos/{}?page={}'.format(TIKITOKS_URL, self.username,
                                                    user_id, data_page)
         headers = {
             'X-Requested-With': 'XMLHttpRequest'
@@ -56,9 +55,9 @@ class TikTokUserVideoApi:
             return False
         return True
 
-    def _get_user_video_urls(self, url):
-        page = requests.get(url, headers=HEADERS)
-        tree = html.fromstring(page.content)
+    def _get_user_video_urls_from_homepege(self, url):
+        resp = requests.get(url, headers=HEADERS)
+        tree = html.fromstring(resp.content)
         user_video_urls = self._get_video_url_from_tree(tree)
         content = self._load_more_videos(tree)
         tree = html.fromstring(content)
@@ -66,11 +65,12 @@ class TikTokUserVideoApi:
         return user_video_urls
 
     def _get_video_src(self, url):
-        page = requests.get(url, headers=HEADERS)
-        tree = html.fromstring(page.content)
-        res = tree.xpath('//video/@src')
+        resp = requests.get(url, headers=HEADERS)
+        if resp.status_code == requests.codes.not_found:
+            return None
+        tree = html.fromstring(resp.content)
         try:
-            source = res[0]
+            source = tree.xpath('//video/@src')[0]
         except IndexError:
             return None
         else:
@@ -84,21 +84,21 @@ class TikTokUserVideoApi:
             threads.append(process)
         for process in threads:
             process.join()
-        # return self._video_data
 
     def _get_video_data(self, video_id):
         tik_tok_url = ''.join([TIKTOK_URL, DOG, username, '/video/', video_id])
         data = {
             video_id: {
                 'tik_tok_url': tik_tok_url,
-                'no_watermark_video_src': self._get_no_watermarked_video_src(
+                'no_watermark_video_src': self.get_no_watermarked_video_src_2(
                     tik_tok_url),
-                'watermark_video_src': self._get_watermarked_video_src(tik_tok_url)
+                'watermark_video_src': self._get_watermarked_video_src(
+                    tik_tok_url)
             }
         }
         self._video_data.append(data)
 
-    def _get_no_watermark_video_url_2(self, tiktok_url):
+    def _get_watermark_video_url_2(self, tiktok_url):
         headers = HEADERS.copy()
         headers['content-type'] = 'application/x-www-form-urlencoded'
         params = {'url': tiktok_url}
@@ -111,7 +111,19 @@ class TikTokUserVideoApi:
         source = tree.xpath('//source/@src')[0]
         return source
 
-    def _get_no_watermarked_video_src(self, tiktok_url):
+    @staticmethod
+    def get_no_watermarked_video_src_2(tiktok_url):
+        resp = requests.get(DOWNLOADTIKTOKVIDEOS, params={'url': tiktok_url})
+        tree = html.fromstring(resp.content)
+        try:
+            source = tree.xpath('//source/@src')[0]
+        except IndexError:
+            return None
+        else:
+            return source
+
+    @staticmethod
+    def get_no_watermarked_video_src(tiktok_url):
         tiki_toks_url = tiktok_url.replace(TIKTOK_URL, TIKITOKS_URL)
         resp = requests.get(tiki_toks_url, headers=HEADERS)
         tree = html.fromstring(resp.content)
@@ -127,7 +139,7 @@ class TikTokUserVideoApi:
 
     def _get_video_urls_from_tiki_toks(self):
         user_home_page_url = ''.join([TIKITOKS_URL + DOG + username])
-        return self._get_user_video_urls(user_home_page_url)
+        return self._get_user_video_urls_from_homepege(user_home_page_url)
 
     @property
     def video_data(self):
@@ -138,12 +150,3 @@ class TikTokUserVideoApi:
             video_ids = (url.split('/')[-2] for url in urls)
             self._threading_requests(video_ids, self._get_video_data)
             return self._video_data
-
-
-username = 'egorkreed'
-user_api = TikTokUserVideoApi(username)
-
-from pprint import pprint
-pprint(user_api.video_data)
-
-
