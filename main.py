@@ -12,7 +12,6 @@ no_watermark_resource = namedtuple('no_watermark_resource',
 
 logger = logging.getLogger()
 
-DOWNLOADTIKTOKVIDEOS = 'https://downloadtiktokvideos.com'
 DOG = '@'
 
 LINKS_NOT_FOUND_OR_SERVER_ERR = 'Links videos not found. Or it is possible ' \

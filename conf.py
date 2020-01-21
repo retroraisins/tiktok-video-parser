@@ -7,7 +7,8 @@ PROXIES = {
     'https': 'https://95.79.57.206:53281'
 }
 
-SRC_FILE_PATH = './sources/video_src.txt'
-URLS_FILE_PATH = './urls/video_urls.txt'
 VIDEOS_FILES_PATH = './videos/'
 FRAMES_FILES_PATH = 'frames/'
+TIKITOKS_URL = 'https://tikitoks.com/'
+TIKTOK_URL = 'https://tiktok.com/'
+DOWNLOADTIKTOKVIDEOS = 'https://downloadtiktokvideos.com'
