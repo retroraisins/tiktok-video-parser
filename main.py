@@ -2,7 +2,6 @@ from threading import Thread
 import requests
 from lxml import html
 import logging
-
 import json
 from conf import HEADERS, PROXIES, TIKTOK_URL, TIKITOKS_URL, \
     DOWNLOADTIKTOKVIDEOS
@@ -21,9 +20,10 @@ USER_NOT_FOUND_ERR = 'Couldn''t find this account'
 
 
 class TikTokUserVideoApi:
-    def __init__(self, username=None):
+    def __init__(self, username=None, proxies=None):
         self.username = username
         self._video_data = []
+        self._proxies = proxies
 
     def _get_user_id_from_tree(self, tree):
         hrefs = tree.xpath('//a/@href')
@@ -150,4 +150,3 @@ class TikTokUserVideoApi:
             video_ids = (url.split('/')[-2] for url in urls)
             self._threading_requests(video_ids, self._get_video_data)
             return self._video_data
-
