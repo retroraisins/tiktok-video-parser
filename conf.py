@@ -10,5 +10,6 @@ PROXIES = {
 VIDEOS_FILES_PATH = './videos/'
 FRAMES_FILES_PATH = 'frames/'
 TIKITOKS_URL = 'https://tikitoks.com/'
-TIKTOK_URL = 'https://tiktok.com/'
+TIKTOK_URL = 'https://www.tiktok.com/'
 DOWNLOADTIKTOKVIDEOS = 'https://downloadtiktokvideos.com'
+EXPERTSPHP = 'https://www.expertsphp.com/download.php'
