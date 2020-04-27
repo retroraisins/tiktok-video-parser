@@ -1,10 +1,12 @@
 from threading import Thread
 import requests
+from requests import HTTPError
 from lxml import html
 import logging
+import re
 import json
 from conf import HEADERS, PROXIES, TIKTOK_URL, TIKITOKS_URL, \
-    DOWNLOADTIKTOKVIDEOS
+    EXPERTSPHP
 from collections import namedtuple
 no_watermark_resource = namedtuple('no_watermark_resource',
                                    'resource, url, xpath, request_type, params')
@@ -32,40 +34,44 @@ class TikTokUserVideoApi:
 
     def _get_video_url_from_tree(self, tree):
         hrefs = tree.xpath('//a/@href')
-        pat = self.username + '/video'
+        pat = self.username.lstrip('@') + '/video'
         return list(filter(lambda x: pat in x, hrefs))
 
     def _load_more_videos(self, tree):
-        data_page = tree.xpath('//a/@data-page')[0]
+        try:
+            data_page = tree.xpath('//a/@data-page')[0]
 
-        user_id = self._get_user_id_from_tree(tree)
-        url = '{}@{}/loadVideos/{}?page={}'.format(TIKITOKS_URL, self.username,
-                                                   user_id, data_page)
-        headers = {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-        resp = requests.get(url, headers=headers)
-        data = json.loads(resp.text)
-        return data['html']
-
-    def _is_user_found(self, tree):
-        page_title = tree.xpath('title')
-        page_title = page_title[0]
-        if page_title == USER_NOT_FOUND_ERR:
-            return False
-        return True
+            user_id = self._get_user_id_from_tree(tree)
+            url = '{}@{}/loadVideos/{}?page={}'.format(TIKITOKS_URL, self.username,
+                                                       user_id, data_page)
+            headers = {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+            resp = requests.get(url, headers=headers, verify=False)
+            resp.raise_for_status()
+            data = json.loads(resp.text)
+        except Exception as e:
+            return ''
+        else:
+            return data['html']
 
     def _get_user_video_urls_from_homepege(self, url):
-        resp = requests.get(url, headers=HEADERS)
+        resp = requests.get(url, headers=HEADERS, verify=False)
+        if not resp:
+            return None
         tree = html.fromstring(resp.content)
         user_video_urls = self._get_video_url_from_tree(tree)
-        content = self._load_more_videos(tree)
-        tree = html.fromstring(content)
-        user_video_urls += self._get_video_url_from_tree(tree)
-        return user_video_urls
+        if user_video_urls:
+            content = self._load_more_videos(tree)
+            if content:
+                tree = html.fromstring(content)
+                user_video_urls += self._get_video_url_from_tree(tree)
+            return user_video_urls
+        else:
+            return None
 
     def _get_video_src(self, url):
-        resp = requests.get(url, headers=HEADERS)
+        resp = requests.get(url, headers=HEADERS, verify=False)
         if resp.status_code == requests.codes.not_found:
             return None
         tree = html.fromstring(resp.content)
@@ -86,7 +92,7 @@ class TikTokUserVideoApi:
             process.join()
 
     def _get_video_data(self, video_id):
-        tik_tok_url = ''.join([TIKTOK_URL, DOG, self.username, '/video/', video_id])
+        tik_tok_url = ''.join([TIKTOK_URL, self.username, '/video/', video_id])
         data = {
             video_id: {
                 'tik_tok_url': tik_tok_url,
@@ -113,23 +119,57 @@ class TikTokUserVideoApi:
 
     @staticmethod
     def get_no_watermarked_video_src_2(tiktok_url):
-        resp = requests.get(DOWNLOADTIKTOKVIDEOS, params={'url': tiktok_url})
-        tree = html.fromstring(resp.content)
+        if not TikTokUserVideoApi.validate_tik_tok_url(tiktok_url) or \
+                not TikTokUserVideoApi.is_exist(TikTokUserVideoApi.get_username_from_url(tiktok_url)):
+            return None
         try:
-            source = tree.xpath('//source/@src')[0]
+            resp = requests.post(EXPERTSPHP, data={'url': tiktok_url})
+            resp.raise_for_status()
+            tree = html.fromstring(resp.content)
+            source = tree.xpath("//a[text()='Download Link']/@href")[0]
         except IndexError:
             return None
+        except HTTPError as err:
+            raise err
         else:
             return source
 
+
+    @staticmethod
+    def get_username_from_url(tiktok_url):
+        res = re.search('https://www.tiktok.com/(@\w+)/video/\d+', tiktok_url)
+        if res:
+            return res.group(1)
+        return None
+
+    @staticmethod
+    def validate_tik_tok_url(tiktok_url):
+        return bool(re.fullmatch(r'https://www.tiktok.com/@\w+/video/\d{19}', tiktok_url))
+
+
+    @staticmethod
+    def is_exist(username):
+        tik_tok_user_url = ''.join([TIKTOK_URL, username])
+        resp = requests.get(tik_tok_user_url, headers=HEADERS, verify=False)
+        if resp.status_code == 404:
+            return False
+        return True
+
+
     @staticmethod
     def get_no_watermarked_video_src(tiktok_url):
-        tiki_toks_url = tiktok_url.replace(TIKTOK_URL, TIKITOKS_URL)
-        resp = requests.get(tiki_toks_url, headers=HEADERS)
-        tree = html.fromstring(resp.content)
+        if not TikTokUserVideoApi.validate_tik_tok_url(tiktok_url) or \
+                not TikTokUserVideoApi.is_exist(TikTokUserVideoApi.get_username_from_url(tiktok_url)):
+            return None
         try:
+            tiki_toks_url = tiktok_url.replace('tiktok.com', 'tikitoks.com')
+            resp = requests.get(tiki_toks_url, headers=HEADERS, verify=False)
+            resp.raise_for_status()
+            tree = html.fromstring(resp.content)
             source = tree.xpath('//video/@src')[0]
-        except IndexError:
+        except IndexError as e:
+            return None
+        except requests.exceptions.ConnectionError:
             return None
         else:
             return source
@@ -138,15 +178,29 @@ class TikTokUserVideoApi:
         return self._get_video_src(tiktok_url)
 
     def _get_video_urls_from_tiki_toks(self):
-        user_home_page_url = ''.join([TIKITOKS_URL + DOG + self.username])
+        user_home_page_url = ''.join([TIKITOKS_URL + self.username])
+        if not requests.get(user_home_page_url, verify=False):
+            return None
         return self._get_user_video_urls_from_homepege(user_home_page_url)
 
     @property
     def video_data(self):
-        if not self.username:
-            logger.warning('Username not found')
-        else:
-            urls = self._get_video_urls_from_tiki_toks()
-            video_ids = (url.split('/')[-2] for url in urls)
-            self._threading_requests(video_ids, self._get_video_data)
-            return self._video_data
+        try:
+            if not self.username or not TikTokUserVideoApi.is_exist(self.username):
+                logger.warning('Username not found')
+                return None
+            else:
+                urls = self._get_video_urls_from_tiki_toks()
+                if urls:
+                    video_ids = (url.split('/')[-2] for url in urls)
+                    self._threading_requests(video_ids, self._get_video_data)
+                    return self._video_data
+                return None
+        except requests.exceptions.HTTPError:
+            raise
+
+
+# username = '@nifty'
+# from pprint import pprint
+# api = TikTokUserVideoApi(username)
+# pprint(api.video_data)
