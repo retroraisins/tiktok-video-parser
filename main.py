@@ -198,9 +198,3 @@ class TikTokUserVideoApi:
                 return None
         except requests.exceptions.HTTPError:
             raise
-
-
-# username = '@nifty'
-# from pprint import pprint
-# api = TikTokUserVideoApi(username)
-# pprint(api.video_data)
